@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "تكلفة البناء وجدوى الاستثمار العقاري"
+description = "تطبيق PWA عربي RTL يعمل محليًا لحساب التقديرات الأولية لتكلفة البناء وجدوى الاستثمار العقاري في المملكة العربية السعودية، مع تجربة موبايل أولًا وحفظ محلي للبيانات."
+version = "1.0.0"
+id = "artifacts/real-estate-feasibility"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18194
+
+[services.development]
+run = "pnpm --filter @workspace/real-estate-feasibility run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/real-estate-feasibility", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/real-estate-feasibility/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18194"
+BASE_PATH = "/"
