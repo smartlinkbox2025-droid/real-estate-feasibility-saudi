@@ -12,26 +12,10 @@ def once(text: str, old: str, new: str, label: str) -> str:
         raise SystemExit(f'{label}: expected exactly 1 match, found {count}')
     return text.replace(old, new, 1)
 
-# ---------------- project-model.ts ----------------
 m = MODEL.read_text()
-m = once(
-    m,
-    "export type LandShape = 'regular' | 'irregular';\n",
-    "export type LandShape = 'regular' | 'irregular';\nexport type AreaInputMode = 'percentage' | 'permit';\n",
-    'area input type',
-)
-m = once(
-    m,
-    "    zoning: string;\n    groundFloorPercentage: number;\n",
-    "    zoning: string;\n    areaInputMode: AreaInputMode;\n    actualGroundFloorArea: number;\n    actualRepeatedFloorsTotalArea: number;\n    actualAnnexArea: number;\n    groundFloorPercentage: number;\n",
-    'compliance fields',
-)
-m = once(
-    m,
-    "    zoning: '',\n    groundFloorPercentage: profile.groundFloorPercentage,\n",
-    "    zoning: '',\n    areaInputMode: 'percentage',\n    actualGroundFloorArea: 0,\n    actualRepeatedFloorsTotalArea: 0,\n    actualAnnexArea: 0,\n    groundFloorPercentage: profile.groundFloorPercentage,\n",
-    'compliance defaults',
-)
+m = once(m, "export type LandShape = 'regular' | 'irregular';\n", "export type LandShape = 'regular' | 'irregular';\nexport type AreaInputMode = 'percentage' | 'permit';\n", 'area input type')
+m = once(m, "    zoning: string;\n    groundFloorPercentage: number;\n", "    zoning: string;\n    areaInputMode: AreaInputMode;\n    actualGroundFloorArea: number;\n    actualRepeatedFloorsTotalArea: number;\n    actualAnnexArea: number;\n    groundFloorPercentage: number;\n", 'compliance fields')
+m = once(m, "    zoning: '',\n    groundFloorPercentage: profile.groundFloorPercentage,\n", "    zoning: '',\n    areaInputMode: 'percentage' as AreaInputMode,\n    actualGroundFloorArea: 0,\n    actualRepeatedFloorsTotalArea: 0,\n    actualAnnexArea: 0,\n    groundFloorPercentage: profile.groundFloorPercentage,\n", 'compliance defaults')
 old_calc = """export const calculateRegulatoryAreas = (project: FeasibilityProject): AreaCalculation => {
   const landArea = safeNumber(project.landArea);
   const groundFloorArea = landArea * safeNumber(project.compliance.groundFloorPercentage) / 100;
@@ -57,21 +41,13 @@ new_calc = """export const calculateRegulatoryAreas = (project: FeasibilityProje
     : landArea * safeNumber(project.compliance.repeatedFloorPercentage) / 100;
   const floorBelowAnnex = repeatedFloors > 0 ? repeatedFloorArea : groundFloorArea;
   const annexArea = project.compliance.annexEnabled
-    ? (permitMode
-      ? safeNumber(project.compliance.actualAnnexArea)
-      : floorBelowAnnex * safeNumber(project.compliance.annexPercentage) / 100)
+    ? (permitMode ? safeNumber(project.compliance.actualAnnexArea) : floorBelowAnnex * safeNumber(project.compliance.annexPercentage) / 100)
     : 0;
 """
 m = once(m, old_calc, new_calc, 'regulatory area calculation')
-m = once(
-    m,
-    "      groundFloorPercentage: rawCompliance?.groundFloorPercentage ?? rawCompliance?.buildingRatio ?? fresh.compliance.groundFloorPercentage,\n",
-    "      areaInputMode: rawCompliance?.areaInputMode ?? fresh.compliance.areaInputMode,\n      actualGroundFloorArea: rawCompliance?.actualGroundFloorArea ?? 0,\n      actualRepeatedFloorsTotalArea: rawCompliance?.actualRepeatedFloorsTotalArea ?? 0,\n      actualAnnexArea: rawCompliance?.actualAnnexArea ?? 0,\n      groundFloorPercentage: rawCompliance?.groundFloorPercentage ?? rawCompliance?.buildingRatio ?? fresh.compliance.groundFloorPercentage,\n",
-    'migration',
-)
+m = once(m, "      groundFloorPercentage: rawCompliance?.groundFloorPercentage ?? rawCompliance?.buildingRatio ?? fresh.compliance.groundFloorPercentage,\n", "      areaInputMode: rawCompliance?.areaInputMode ?? fresh.compliance.areaInputMode,\n      actualGroundFloorArea: rawCompliance?.actualGroundFloorArea ?? 0,\n      actualRepeatedFloorsTotalArea: rawCompliance?.actualRepeatedFloorsTotalArea ?? 0,\n      actualAnnexArea: rawCompliance?.actualAnnexArea ?? 0,\n      groundFloorPercentage: rawCompliance?.groundFloorPercentage ?? rawCompliance?.buildingRatio ?? fresh.compliance.groundFloorPercentage,\n", 'migration')
 MODEL.write_text(m)
 
-# ---------------- App.tsx ----------------
 a = APP.read_text()
 old_intro = """          <Field label=\"رمز التنظيم\" hint=\"اختياري\">
             <input value={project.compliance.zoning} onChange={(event) => patchNested('compliance', { zoning: event.target.value })} placeholder=\"مثال: سكني أ\" data-testid=\"input-zoning\" />
@@ -88,21 +64,15 @@ new_intro = """          <Field label=\"رمز التنظيم\" hint=\"اختي�
             </div>
           </Field>
           {project.compliance.areaInputMode === 'permit' ? <>
-            <Field label=\"مساحة الدور الأرضي الفعلية\" hint=\"من الرخصة / المخطط\">
-              <div className=\"input-with-unit\"><input className=\"number-input\" type=\"number\" min=\"0\" step=\"0.01\" value={project.compliance.actualGroundFloorArea || ''} onChange={(event) => patchNested('compliance', { actualGroundFloorArea: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-actual-ground-area\" /><span className=\"input-unit\">م²</span></div>
-            </Field>
-            <Field label=\"إجمالي مساحة الأدوار المتكررة الفعلية\" hint=\"إجمالي جميع الأدوار المتكررة من الرخصة\">
-              <div className=\"input-with-unit\"><input className=\"number-input\" type=\"number\" min=\"0\" step=\"0.01\" value={project.compliance.actualRepeatedFloorsTotalArea || ''} onChange={(event) => patchNested('compliance', { actualRepeatedFloorsTotalArea: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-actual-repeated-total-area\" /><span className=\"input-unit\">م²</span></div>
-            </Field>
-            <Field label=\"مساحة الملحق الفعلية\" hint=\"تستخدم عند تفعيل الملحق\">
-              <div className=\"input-with-unit\"><input className=\"number-input\" type=\"number\" min=\"0\" step=\"0.01\" value={project.compliance.actualAnnexArea || ''} onChange={(event) => patchNested('compliance', { actualAnnexArea: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-actual-annex-area\" /><span className=\"input-unit\">م²</span></div>
-            </Field>
+            <Field label=\"مساحة الدور الأرضي الفعلية\" hint=\"من الرخصة / المخطط\"><div className=\"input-with-unit\"><input className=\"number-input\" type=\"number\" min=\"0\" step=\"0.01\" value={project.compliance.actualGroundFloorArea || ''} onChange={(event) => patchNested('compliance', { actualGroundFloorArea: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-actual-ground-area\" /><span className=\"input-unit\">م²</span></div></Field>
+            <Field label=\"إجمالي مساحة الأدوار المتكررة الفعلية\" hint=\"إجمالي جميع الأدوار المتكررة من الرخصة\"><div className=\"input-with-unit\"><input className=\"number-input\" type=\"number\" min=\"0\" step=\"0.01\" value={project.compliance.actualRepeatedFloorsTotalArea || ''} onChange={(event) => patchNested('compliance', { actualRepeatedFloorsTotalArea: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-actual-repeated-total-area\" /><span className=\"input-unit\">م²</span></div></Field>
+            <Field label=\"مساحة الملحق الفعلية\" hint=\"تستخدم عند تفعيل الملحق\"><div className=\"input-with-unit\"><input className=\"number-input\" type=\"number\" min=\"0\" step=\"0.01\" value={project.compliance.actualAnnexArea || ''} onChange={(event) => patchNested('compliance', { actualAnnexArea: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-actual-annex-area\" /><span className=\"input-unit\">م²</span></div></Field>
             <div className=\"notice full\"><Info size={16} /><span>في هذا الوضع تُستخدم المساحات الفعلية مباشرة في حساب المسطحات والجدوى، ولا تُشتق من النسب المئوية. النسب تبقى محفوظة عند العودة إلى وضع حساب بالنسب.</span></div>
           </> : <>
           <Field label={<span>نسبة الأرضي <span style={{ marginInlineStart: 7 }}>{assumption('groundFloorPercentage', project.type === 'مخصص' || project.type === 'عمارة سكنية تجارية')}</span></span>} hint=\"من مساحة الأرض\">
 """
 a = once(a, old_intro, new_intro, 'area mode UI intro')
-old_after_annex_pct = """          <Field label=\"نسبة الملحق\" hint={assumption('annexPercentage', project.type === 'مخصص' || project.type === 'عمارة سكنية تجارية')}>
+old_after = """          <Field label=\"نسبة الملحق\" hint={assumption('annexPercentage', project.type === 'مخصص' || project.type === 'عمارة سكنية تجارية')}>
             <div className=\"input-with-unit\">
               <input className=\"number-input\" type=\"number\" min=\"0\" max=\"100\" value={project.compliance.annexPercentage || ''} onChange={(event) => patchNested('compliance', { annexPercentage: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-annex-percentage\" />
               <span className=\"input-unit\">٪</span>
@@ -110,25 +80,16 @@ old_after_annex_pct = """          <Field label=\"نسبة الملحق\" hint={
           </Field>
           <Field label=\"عدد الوحدات السكنية\" hint=\"يستخدم لحساب المواقف\">
 """
-new_after_annex_pct = """          <Field label=\"نسبة الملحق\" hint={assumption('annexPercentage', project.type === 'مخصص' || project.type === 'عمارة سكنية تجارية')}>
-            <div className=\"input-with-unit\">
-              <input className=\"number-input\" type=\"number\" min=\"0\" max=\"100\" value={project.compliance.annexPercentage || ''} onChange={(event) => patchNested('compliance', { annexPercentage: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-annex-percentage\" />
-              <span className=\"input-unit\">٪</span>
-            </div>
+new_after = """          <Field label=\"نسبة الملحق\" hint={assumption('annexPercentage', project.type === 'مخصص' || project.type === 'عمارة سكنية تجارية')}>
+            <div className=\"input-with-unit\"><input className=\"number-input\" type=\"number\" min=\"0\" max=\"100\" value={project.compliance.annexPercentage || ''} onChange={(event) => patchNested('compliance', { annexPercentage: Number(event.target.value) || 0 })} placeholder=\"٠\" data-testid=\"input-annex-percentage\" /><span className=\"input-unit\">٪</span></div>
           </Field>
           </>}
           <Field label=\"عدد الوحدات السكنية\" hint=\"يستخدم لحساب المواقف\">
 """
-a = once(a, old_after_annex_pct, new_after_annex_pct, 'area mode UI close')
-a = once(
-    a,
-    "        <p>تتحدث النتائج فوراً من المدخلات، مع إبقاء البدروم منفصلاً عن المساحة فوق الأرض.</p>\n",
-    "        <p>تتحدث النتائج فوراً من المدخلات، مع إبقاء البدروم منفصلاً عن المساحة فوق الأرض.</p>\n        <div className=\"notice\" style={{ marginBottom: 12 }}><Info size={16} /><span>مصدر المساحات: {project.compliance.areaInputMode === 'permit' ? 'مساحات فعلية من الرخصة' : 'حساب بالنسب'}</span></div>\n",
-    'summary source',
-)
+a = once(a, old_after, new_after, 'area mode UI close')
+a = once(a, "        <p>تتحدث النتائج فوراً من المدخلات، مع إبقاء البدروم منفصلاً عن المساحة فوق الأرض.</p>\n", "        <p>تتحدث النتائج فوراً من المدخلات، مع إبقاء البدروم منفصلاً عن المساحة فوق الأرض.</p>\n        <div className=\"notice\" style={{ marginBottom: 12 }}><Info size={16} /><span>مصدر المساحات: {project.compliance.areaInputMode === 'permit' ? 'مساحات فعلية من الرخصة' : 'حساب بالنسب'}</span></div>\n", 'summary source')
 APP.write_text(a)
 
-# ---------------- report-generator.ts ----------------
 r = REPORT.read_text()
 old_reg = """  const regulationInfo = table(['الافتراض التنظيمي الأولي', 'القيمة'], [
     ['نسبة الدور الأرضي', number(project.compliance.groundFloorPercentage, '٪')],
@@ -152,5 +113,4 @@ new_reg = """  const regulationInfo = table(['الافتراض التنظيمي 
 """
 r = once(r, old_reg, new_reg, 'report regulation source')
 REPORT.write_text(r)
-
 print('Permit actual-areas patch applied successfully')
