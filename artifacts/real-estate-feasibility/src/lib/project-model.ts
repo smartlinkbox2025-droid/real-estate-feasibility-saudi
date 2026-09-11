@@ -20,6 +20,7 @@ export type FeeKind = 'percentage' | 'fixed';
 export type OptionalFeeScope = 'development' | 'land-transaction';
 export type FeasibilityState = 'positive' | 'review' | 'negative';
 export type LandShape = 'regular' | 'irregular';
+export type AreaInputMode = 'percentage' | 'permit';
 
 export interface ServiceArea {
   id: string;
@@ -103,6 +104,10 @@ export interface FeasibilityProject {
   type: ProjectType;
   compliance: {
     zoning: string;
+    areaInputMode: AreaInputMode;
+    actualGroundFloorArea: number;
+    actualRepeatedFloorsTotalArea: number;
+    actualAnnexArea: number;
     groundFloorPercentage: number;
     repeatedFloorPercentage: number;
     repeatedFloors: number;
@@ -402,6 +407,10 @@ const createDefaultCompliance = (type: ProjectType) => {
   const profile = getRegulatoryProfile(type);
   return {
     zoning: '',
+    areaInputMode: 'percentage' as AreaInputMode,
+    actualGroundFloorArea: 0,
+    actualRepeatedFloorsTotalArea: 0,
+    actualAnnexArea: 0,
     groundFloorPercentage: profile.groundFloorPercentage,
     repeatedFloorPercentage: profile.repeatedFloorPercentage,
     repeatedFloors: 0,
@@ -570,12 +579,20 @@ export const calculateParkingRequirement = (project: FeasibilityProject) =>
 
 export const calculateRegulatoryAreas = (project: FeasibilityProject): AreaCalculation => {
   const landArea = safeNumber(project.landArea);
-  const groundFloorArea = landArea * safeNumber(project.compliance.groundFloorPercentage) / 100;
-  const repeatedFloorArea = landArea * safeNumber(project.compliance.repeatedFloorPercentage) / 100;
-  const totalRepeatedFloorsArea = repeatedFloorArea * safeNumber(project.compliance.repeatedFloors);
-  const floorBelowAnnex = safeNumber(project.compliance.repeatedFloors) > 0 ? repeatedFloorArea : groundFloorArea;
+  const permitMode = project.compliance.areaInputMode === 'permit';
+  const repeatedFloors = safeNumber(project.compliance.repeatedFloors);
+  const groundFloorArea = permitMode
+    ? safeNumber(project.compliance.actualGroundFloorArea)
+    : landArea * safeNumber(project.compliance.groundFloorPercentage) / 100;
+  const totalRepeatedFloorsArea = permitMode
+    ? safeNumber(project.compliance.actualRepeatedFloorsTotalArea)
+    : landArea * safeNumber(project.compliance.repeatedFloorPercentage) / 100 * repeatedFloors;
+  const repeatedFloorArea = permitMode
+    ? (repeatedFloors > 0 ? totalRepeatedFloorsArea / repeatedFloors : 0)
+    : landArea * safeNumber(project.compliance.repeatedFloorPercentage) / 100;
+  const floorBelowAnnex = repeatedFloors > 0 ? repeatedFloorArea : groundFloorArea;
   const annexArea = project.compliance.annexEnabled
-    ? floorBelowAnnex * safeNumber(project.compliance.annexPercentage) / 100
+    ? (permitMode ? safeNumber(project.compliance.actualAnnexArea) : floorBelowAnnex * safeNumber(project.compliance.annexPercentage) / 100)
     : 0;
   const aboveGroundBuiltArea = groundFloorArea + totalRepeatedFloorsArea + annexArea;
   const basementArea = project.compliance.basementEnabled ? safeNumber(project.compliance.basementArea) : 0;
@@ -941,6 +958,10 @@ const migrateProject = (raw: Partial<FeasibilityProject>): FeasibilityProject =>
     compliance: {
       ...fresh.compliance,
       ...rawCompliance,
+      areaInputMode: rawCompliance?.areaInputMode ?? fresh.compliance.areaInputMode,
+      actualGroundFloorArea: rawCompliance?.actualGroundFloorArea ?? 0,
+      actualRepeatedFloorsTotalArea: rawCompliance?.actualRepeatedFloorsTotalArea ?? 0,
+      actualAnnexArea: rawCompliance?.actualAnnexArea ?? 0,
       groundFloorPercentage: rawCompliance?.groundFloorPercentage ?? rawCompliance?.buildingRatio ?? fresh.compliance.groundFloorPercentage,
       repeatedFloorPercentage: rawCompliance?.repeatedFloorPercentage ?? fresh.compliance.repeatedFloorPercentage,
       repeatedFloors: rawCompliance?.repeatedFloors ?? rawCompliance?.floors ?? fresh.compliance.repeatedFloors,

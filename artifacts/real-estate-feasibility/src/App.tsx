@@ -752,6 +752,18 @@ function ComplianceStep({
           <Field label="رمز التنظيم" hint="اختياري">
             <input value={project.compliance.zoning} onChange={(event) => patchNested('compliance', { zoning: event.target.value })} placeholder="مثال: سكني أ" data-testid="input-zoning" />
           </Field>
+          <Field label="طريقة إدخال المساحات" hint="استخدم المساحات الفعلية عند توفر رخصة أو مخطط معتمد" full>
+            <div className="choice-grid choice-grid--compact">
+              <button type="button" className={`choice ${project.compliance.areaInputMode === 'percentage' ? 'is-selected' : ''}`} onClick={() => patchNested('compliance', { areaInputMode: 'percentage' })} data-testid="button-area-mode-percentage">حساب بالنسب</button>
+              <button type="button" className={`choice ${project.compliance.areaInputMode === 'permit' ? 'is-selected' : ''}`} onClick={() => patchNested('compliance', { areaInputMode: 'permit' })} data-testid="button-area-mode-permit">مساحات فعلية من الرخصة</button>
+            </div>
+          </Field>
+          {project.compliance.areaInputMode === 'permit' ? <>
+            <Field label="مساحة الدور الأرضي الفعلية" hint="من الرخصة / المخطط"><div className="input-with-unit"><input className="number-input" type="number" min="0" step="0.01" value={project.compliance.actualGroundFloorArea || ''} onChange={(event) => patchNested('compliance', { actualGroundFloorArea: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-actual-ground-area" /><span className="input-unit">م²</span></div></Field>
+            <Field label="إجمالي مساحة الأدوار المتكررة الفعلية" hint="إجمالي جميع الأدوار المتكررة من الرخصة"><div className="input-with-unit"><input className="number-input" type="number" min="0" step="0.01" value={project.compliance.actualRepeatedFloorsTotalArea || ''} onChange={(event) => patchNested('compliance', { actualRepeatedFloorsTotalArea: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-actual-repeated-total-area" /><span className="input-unit">م²</span></div></Field>
+            <Field label="مساحة الملحق الفعلية" hint="تستخدم عند تفعيل الملحق"><div className="input-with-unit"><input className="number-input" type="number" min="0" step="0.01" value={project.compliance.actualAnnexArea || ''} onChange={(event) => patchNested('compliance', { actualAnnexArea: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-actual-annex-area" /><span className="input-unit">م²</span></div></Field>
+            <div className="notice full"><Info size={16} /><span>في هذا الوضع تُستخدم المساحات الفعلية مباشرة في حساب المسطحات والجدوى، ولا تُشتق من النسب المئوية. النسب تبقى محفوظة عند العودة إلى وضع حساب بالنسب.</span></div>
+          </> : <>
           <Field label={<span>نسبة الأرضي <span style={{ marginInlineStart: 7 }}>{assumption('groundFloorPercentage', project.type === 'مخصص' || project.type === 'عمارة سكنية تجارية')}</span></span>} hint="من مساحة الأرض">
             <div className="input-with-unit">
               <input className="number-input" type="number" min="0" max="100" value={project.compliance.groundFloorPercentage || ''} onChange={(event) => patchNested('compliance', { groundFloorPercentage: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-ground-floor-percentage" />
@@ -768,11 +780,9 @@ function ComplianceStep({
             <input className="number-input" type="number" min="0" step="1" value={project.compliance.repeatedFloors || ''} onChange={(event) => patchNested('compliance', { repeatedFloors: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-repeated-floors" />
           </Field>
           <Field label="نسبة الملحق" hint={assumption('annexPercentage', project.type === 'مخصص' || project.type === 'عمارة سكنية تجارية')}>
-            <div className="input-with-unit">
-              <input className="number-input" type="number" min="0" max="100" value={project.compliance.annexPercentage || ''} onChange={(event) => patchNested('compliance', { annexPercentage: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-annex-percentage" />
-              <span className="input-unit">٪</span>
-            </div>
+            <div className="input-with-unit"><input className="number-input" type="number" min="0" max="100" value={project.compliance.annexPercentage || ''} onChange={(event) => patchNested('compliance', { annexPercentage: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-annex-percentage" /><span className="input-unit">٪</span></div>
           </Field>
+          </>}
           <Field label="عدد الوحدات السكنية" hint="يستخدم لحساب المواقف">
             <input className="number-input" type="number" min="0" step="1" value={project.compliance.residentialUnits || ''} onChange={(event) => patchNested('compliance', { residentialUnits: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-residential-units" />
           </Field>
@@ -836,6 +846,7 @@ function ComplianceStep({
         <div className="placeholder-icon" style={{ background: 'rgba(112,225,211,.15)', color: '#8ce9db' }}><Map size={22} /></div>
         <h2>نتيجة المساحات الحالية</h2>
         <p>تتحدث النتائج فوراً من المدخلات، مع إبقاء البدروم منفصلاً عن المساحة فوق الأرض.</p>
+        <div className="notice" style={{ marginBottom: 12 }}><Info size={16} /><span>مصدر المساحات: {project.compliance.areaInputMode === 'permit' ? 'مساحات فعلية من الرخصة' : 'حساب بالنسب'}</span></div>
         <div className="summary-list summary-list--dark">
           <div className="summary-row"><span>الأرضي</span><strong>{formatNumber(areas.groundFloorArea)} م²</strong></div>
           <div className="summary-row"><span>الدور المتكرر</span><strong>{formatNumber(areas.repeatedFloorArea)} م²</strong></div>

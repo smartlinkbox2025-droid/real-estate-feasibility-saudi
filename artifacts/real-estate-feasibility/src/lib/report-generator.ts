@@ -187,10 +187,18 @@ export const buildReportHtml = (
     ['القيمة المعتمدة', `${money(land.approvedLandValue)} — ${land.usesActualPurchasePrice ? 'سعر الشراء الفعلي' : 'القيمة المحسوبة'}`],
   ]);
   const regulationInfo = table(['الافتراض التنظيمي الأولي', 'القيمة'], [
-    ['نسبة الدور الأرضي', number(project.compliance.groundFloorPercentage, '٪')],
-    ['نسبة الدور المتكرر', number(project.compliance.repeatedFloorPercentage, '٪')],
+    ['مصدر المساحات', project.compliance.areaInputMode === 'permit' ? 'مساحات فعلية من الرخصة / المخطط' : 'حساب بالنسب'],
+    ...(project.compliance.areaInputMode === 'permit' ? [
+      ['مساحة الدور الأرضي الفعلية', number(project.compliance.actualGroundFloorArea, ' م²')],
+      ['إجمالي الأدوار المتكررة الفعلي', number(project.compliance.actualRepeatedFloorsTotalArea, ' م²')],
+      ['مساحة الملحق الفعلية', project.compliance.annexEnabled ? number(project.compliance.actualAnnexArea, ' م²') : 'غير مفعل'],
+    ] : [
+      ['نسبة الدور الأرضي', number(project.compliance.groundFloorPercentage, '٪')],
+      ['نسبة الدور المتكرر', number(project.compliance.repeatedFloorPercentage, '٪')],
+      ['نسبة الملحق', project.compliance.annexEnabled ? number(project.compliance.annexPercentage, '٪') : 'غير مفعل'],
+    ]),
     ['عدد الأدوار المتكررة', number(project.compliance.repeatedFloors)],
-    ['الملحق', project.compliance.annexEnabled ? `مفعل — ${number(project.compliance.annexPercentage, '٪')}` : 'غير مفعل'],
+    ['الملحق', project.compliance.annexEnabled ? 'مفعل' : 'غير مفعل'],
     ['البدروم', project.compliance.basementEnabled ? `مفعل — ${number(project.compliance.basementArea, ' م²')}` : 'غير مفعل'],
     ['عدد الوحدات السكنية', number(project.compliance.residentialUnits)],
     ['المواقف المطلوبة', number(areas.requiredParking)],
