@@ -642,24 +642,24 @@ function LandStep({
           </div>
         </Field>
         <div className="section-divider"><span>أبعاد القطعة</span></div>
-        <Field label="مساحة الأرض" hint="المساحة المسجلة أو الأقرب للواقع" error={errors.landArea}>
-          <div className="input-with-unit">
-            <input className="number-input" type="number" min="0" value={project.landArea || ''} onChange={(event) => patchProject({ landArea: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-land-area" />
-            <span className="input-unit">م²</span>
+        <Field label="شكل الأرض" hint="اختر غير منتظمة عندما لا يمكن تمثيل القطعة بعرض × عمق" full>
+          <div className="choice-grid choice-grid--compact">
+            <button type="button" className={`choice ${project.landShape === 'regular' ? 'is-selected' : ''}`} onClick={() => patchProject({ landShape: 'regular' })}>منتظمة</button>
+            <button type="button" className={`choice ${project.landShape === 'irregular' ? 'is-selected' : ''}`} onClick={() => patchProject({ landShape: 'irregular' })}>غير منتظمة</button>
           </div>
         </Field>
-        <Field label="عرض الشارع" hint="اختياري">
-          <div className="input-with-unit">
-            <input className="number-input" type="number" min="0" value={project.frontage || ''} onChange={(event) => patchProject({ frontage: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-land-frontage" />
-            <span className="input-unit">م</span>
-          </div>
+        <Field label="مساحة الأرض" hint="المساحة الرسمية أو المسجلة هي المرجع الأساسي" error={errors.landArea}>
+          <div className="input-with-unit"><input className="number-input" type="number" min="0" step="0.01" value={project.landArea || ''} onChange={(event) => patchProject({ landArea: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-land-area" /><span className="input-unit">م²</span></div>
         </Field>
-        <Field label="عمق الأرض" hint="اختياري">
-          <div className="input-with-unit">
-            <input className="number-input" type="number" min="0" value={project.depth || ''} onChange={(event) => patchProject({ depth: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-land-depth" />
-            <span className="input-unit">م</span>
-          </div>
-        </Field>
+        {project.landShape === 'regular' ? <>
+          <Field label="عرض الأرض" hint="اختياري"><div className="input-with-unit"><input className="number-input" type="number" min="0" step="0.01" value={project.frontage || ''} onChange={(event) => patchProject({ frontage: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-land-frontage" /><span className="input-unit">م</span></div></Field>
+          <Field label="عمق الأرض" hint="اختياري"><div className="input-with-unit"><input className="number-input" type="number" min="0" step="0.01" value={project.depth || ''} onChange={(event) => patchProject({ depth: Number(event.target.value) || 0 })} placeholder="٠" data-testid="input-land-depth" /><span className="input-unit">م</span></div></Field>
+        </> : <>
+          {([['boundaryNorth', 'الحد الشمالي'], ['boundaryEast', 'الحد الشرقي'], ['boundarySouth', 'الحد الجنوبي'], ['boundaryWest', 'الحد الغربي']] as const).map(([key, label]) => (
+            <Field key={key} label={label} hint={key === 'boundarySouth' ? 'إذا كان الحد مكسراً أدخل مجموع أطوال أجزائه واذكر التفصيل في الملاحظات' : 'من الصك أو الرخصة'}><div className="input-with-unit"><input className="number-input" type="number" min="0" step="0.01" value={project[key] || ''} onChange={(event) => patchProject({ [key]: Number(event.target.value) || 0 })} placeholder="٠" /><span className="input-unit">م</span></div></Field>
+          ))}
+          <div className="notice full"><Info size={16} /><span>للأرض غير المنتظمة تعتمد الدراسة على مساحة الأرض الرسمية، وأطوال الحدود معلومات مرجعية فقط.</span></div>
+        </>}
         <Field label="عدد الشوارع" hint="اتركه بصفر إذا لم تتأكد" error={errors.streetsCount}>
           <input className="number-input" type="number" min="0" step="1" value={project.streetsCount || ''} onChange={(event) => patchProject({ streetsCount: Number(event.target.value) || 0 })} placeholder="١" data-testid="input-streets-count" />
         </Field>
@@ -734,6 +734,9 @@ function ComplianceStep({
     const item = status(key, needsVerification);
     return <span style={{ color: item.color, fontSize: 10, fontWeight: 800 }}>{item.label}</span>;
   };
+  const addServiceArea = () => patchNested('compliance', { serviceAreas: [...project.compliance.serviceAreas, { id: `service-${Date.now()}`, label: '', area: 0 }] });
+  const updateServiceArea = (id: string, patch: Partial<{ label: string; area: number }>) => patchNested('compliance', { serviceAreas: project.compliance.serviceAreas.map((item) => item.id === id ? { ...item, ...patch } : item) });
+  const deleteServiceArea = (id: string) => patchNested('compliance', { serviceAreas: project.compliance.serviceAreas.filter((item) => item.id !== id) });
   return (
     <div className="placeholder-layout">
       <div className="form-card">
@@ -811,6 +814,18 @@ function ComplianceStep({
               <button type="button" className="ghost-button button-small" onClick={() => patchNested('compliance', { approvedFeasibilityArea: 0 })} data-testid="button-restore-calculated-area">استخدام المحسوبة</button>
             </div>
           </Field>
+          <div className="section-divider"><span>مساحات خدمية / ترخيصية إضافية</span></div>
+          <div className="stack-list full">
+            <div className="notice"><Info size={16} /><span>تُستخدم هذه المساحات لمطابقة الرخصة أو المخطط، ولا تدخل تلقائياً في تكلفة البناء أو المساحة المعتمدة للجدوى.</span></div>
+            {project.compliance.serviceAreas.map((item, index) => (
+              <div className="repeat-row" key={item.id}>
+                <input value={item.label} onChange={(event) => updateServiceArea(item.id, { label: event.target.value })} placeholder="مثال: بيت درج ومصاعد" />
+                <div className="input-with-unit"><input className="number-input" type="number" min="0" step="0.01" value={item.area || ''} onChange={(event) => updateServiceArea(item.id, { area: Number(event.target.value) || 0 })} placeholder="٠" /><span className="input-unit">م²</span></div>
+                <button type="button" className="danger-button button-small" onClick={() => deleteServiceArea(item.id)}>حذف</button>
+              </div>
+            ))}
+            <button type="button" className="secondary-button button-small" onClick={addServiceArea}>+ إضافة مساحة خدمية</button>
+          </div>
         </div>
         <div className="notice" style={{ marginTop: 22 }}>
           <Info size={16} />
@@ -828,7 +843,9 @@ function ComplianceStep({
           <div className="summary-row"><span>الملحق</span><strong>{formatNumber(areas.annexArea)} م²</strong></div>
           <div className="summary-row"><span>فوق الأرض</span><strong>{formatNumber(areas.aboveGroundBuiltArea)} م²</strong></div>
           <div className="summary-row"><span>البدروم</span><strong>{formatNumber(areas.basementArea)} م²</strong></div>
-          <div className="summary-row"><span>الإجمالي</span><strong>{formatNumber(areas.totalBuiltUpArea)} م²</strong></div>
+          <div className="summary-row"><span>الإجمالي الأساسي</span><strong>{formatNumber(areas.totalBuiltUpArea)} م²</strong></div>
+          <div className="summary-row"><span>المساحات الخدمية / الترخيصية</span><strong>{formatNumber(areas.serviceAreasTotal)} م²</strong></div>
+          <div className="summary-row"><span>الإجمالي للمطابقة مع الرخصة</span><strong>{formatNumber(areas.licensedAreaWithServices)} م²</strong></div>
           <div className="summary-row"><span>المواقف المطلوبة</span><strong>{formatNumber(areas.requiredParking)}</strong></div>
           <div className="summary-row"><span>الارتداد الأمامي</span><strong>{setback.front === null ? 'يحتاج التحقق' : `${formatNumber(setback.front)} م`}</strong></div>
         </div>
@@ -893,13 +910,13 @@ function ComplianceStep({
           </Field>
           <Field label="المساحة المعتمدة فوق الأرض" hint="قادمة من الخطوة الثانية">
             <div className="input-with-unit">
-              <input className="number-input" type="number" value={areas.approvedFeasibilityArea || ''} readOnly data-testid="input-approved-area-readonly" />
+              <input className="number-input" type="number" value={areas.approvedFeasibilityArea ? Number(areas.approvedFeasibilityArea.toFixed(2)) : ''} readOnly data-testid="input-approved-area-readonly" />
               <span className="input-unit">م²</span>
             </div>
           </Field>
           <Field label="مساحة البدروم" hint="قادمة من الخطوة الثانية — لا تدخل في معدل البناء">
             <div className="input-with-unit">
-              <input className="number-input" type="number" value={areas.basementArea || ''} readOnly data-testid="input-basement-area-readonly" />
+              <input className="number-input" type="number" value={areas.basementArea ? Number(areas.basementArea.toFixed(2)) : ''} readOnly data-testid="input-basement-area-readonly" />
               <span className="input-unit">م²</span>
             </div>
           </Field>

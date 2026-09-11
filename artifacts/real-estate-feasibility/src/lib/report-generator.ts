@@ -175,8 +175,10 @@ export const buildReportHtml = (
   ]);
   const landInfo = table(['البيان', 'القيمة'], [
     ['مساحة الأرض', number(project.landArea, ' م²')],
-    ['عرض الأرض', number(project.frontage, ' م')],
-    ['عمق الأرض', number(project.depth, ' م')],
+    ['شكل الأرض', project.landShape === 'irregular' ? 'غير منتظمة' : 'منتظمة'],
+    ...(project.landShape === 'irregular' ? [
+      ['الحد الشمالي', number(project.boundaryNorth, ' م')], ['الحد الشرقي', number(project.boundaryEast, ' م')], ['الحد الجنوبي', number(project.boundarySouth, ' م')], ['الحد الغربي', number(project.boundaryWest, ' م')],
+    ] : [['عرض الأرض', number(project.frontage, ' م')], ['عمق الأرض', number(project.depth, ' م')]]),
     ['عدد الشوارع', number(project.streetsCount)],
     ['عرض الشارع', number(project.streetWidth, ' م')],
     ['سعر الأرض / م²', `${money(project.landPricePerSqm)} / م²`],
@@ -203,7 +205,10 @@ export const buildReportHtml = (
     ['الملحق', number(areas.annexArea, ' م²')],
     ['المساحة المبنية فوق الأرض', number(areas.aboveGroundBuiltArea, ' م²')],
     ['البدروم', number(areas.basementArea, ' م²')],
-    ['إجمالي المسطحات المبنية', number(areas.totalBuiltUpArea, ' م²')],
+    ['إجمالي المسطحات الأساسية', number(areas.totalBuiltUpArea, ' م²')],
+    ...project.compliance.serviceAreas.filter((item) => item.area > 0).map((item) => [`مساحة خدمية: ${item.label || 'غير مسماة'}`, number(item.area, ' م²')]),
+    ['إجمالي المساحات الخدمية / الترخيصية', number(areas.serviceAreasTotal, ' م²')],
+    ['إجمالي المسطحات للمطابقة مع الرخصة', number(areas.licensedAreaWithServices, ' م²')],
     ['المساحة المعتمدة للجدوى', number(areas.approvedFeasibilityArea, ' م²')],
     ['المساحة القابلة للبيع', number(areas.saleableArea, ' م²')],
     ['كفاءة البيع', efficiency],

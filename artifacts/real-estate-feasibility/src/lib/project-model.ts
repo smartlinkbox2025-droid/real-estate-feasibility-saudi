@@ -19,6 +19,13 @@ export type CostBasis = 'before-contingency' | 'after-contingency' | 'land-value
 export type FeeKind = 'percentage' | 'fixed';
 export type OptionalFeeScope = 'development' | 'land-transaction';
 export type FeasibilityState = 'positive' | 'review' | 'negative';
+export type LandShape = 'regular' | 'irregular';
+
+export interface ServiceArea {
+  id: string;
+  label: string;
+  area: number;
+}
 
 export interface OtherExpense {
   id: string;
@@ -79,8 +86,13 @@ export interface FeasibilityProject {
   customCity: string;
   district: string;
   landArea: number;
+  landShape: LandShape;
   frontage: number;
   depth: number;
+  boundaryNorth: number;
+  boundaryEast: number;
+  boundarySouth: number;
+  boundaryWest: number;
   streetsCount: number;
   streetWidth: number;
   landPricePerSqm: number;
@@ -102,6 +114,7 @@ export interface FeasibilityProject {
     residentialUnits: number;
     parkingPerUnit: number;
     approvedFeasibilityArea: number;
+    serviceAreas: ServiceArea[];
     overrides: Partial<Record<AssumptionKey, boolean>>;
   };
   build: {
@@ -179,6 +192,8 @@ export interface AreaCalculation {
   aboveGroundBuiltArea: number;
   basementArea: number;
   totalBuiltUpArea: number;
+  serviceAreasTotal: number;
+  licensedAreaWithServices: number;
   calculatedFeasibilityArea: number;
   approvedFeasibilityArea: number;
   feasibilityIsManual: boolean;
@@ -398,6 +413,7 @@ const createDefaultCompliance = (type: ProjectType) => {
     residentialUnits: 0,
     parkingPerUnit: profile.parkingPerUnit,
     approvedFeasibilityArea: 0,
+    serviceAreas: [],
     overrides: {},
   };
 };
@@ -433,8 +449,13 @@ export const createEmptyProject = (): FeasibilityProject => {
     customCity: '',
     district: '',
     landArea: 0,
+    landShape: 'regular',
     frontage: 0,
     depth: 0,
+    boundaryNorth: 0,
+    boundaryEast: 0,
+    boundarySouth: 0,
+    boundaryWest: 0,
     streetsCount: 1,
     streetWidth: 0,
     landPricePerSqm: 0,
@@ -493,7 +514,7 @@ export const formatSAR = (value: number | null | undefined) =>
   }).format(Number.isFinite(value) ? value ?? 0 : 0);
 
 export const formatNumber = (value: number | null | undefined) =>
-  new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 1 }).format(
+  new Intl.NumberFormat('ar-SA', { maximumFractionDigits: 2 }).format(
     Number.isFinite(value) ? value ?? 0 : 0,
   );
 
@@ -559,6 +580,8 @@ export const calculateRegulatoryAreas = (project: FeasibilityProject): AreaCalcu
   const aboveGroundBuiltArea = groundFloorArea + totalRepeatedFloorsArea + annexArea;
   const basementArea = project.compliance.basementEnabled ? safeNumber(project.compliance.basementArea) : 0;
   const totalBuiltUpArea = aboveGroundBuiltArea + basementArea;
+  const serviceAreasTotal = (project.compliance.serviceAreas ?? []).reduce((sum, item) => sum + safeNumber(item.area), 0);
+  const licensedAreaWithServices = totalBuiltUpArea + serviceAreasTotal;
   const calculatedFeasibilityArea = aboveGroundBuiltArea;
   const feasibilityIsManual = safeNumber(project.compliance.approvedFeasibilityArea) > 0;
   const approvedFeasibilityArea = feasibilityIsManual
@@ -573,6 +596,8 @@ export const calculateRegulatoryAreas = (project: FeasibilityProject): AreaCalcu
     aboveGroundBuiltArea,
     basementArea,
     totalBuiltUpArea,
+    serviceAreasTotal,
+    licensedAreaWithServices,
     calculatedFeasibilityArea,
     approvedFeasibilityArea,
     feasibilityIsManual,
@@ -901,6 +926,11 @@ const migrateProject = (raw: Partial<FeasibilityProject>): FeasibilityProject =>
     id: raw.id || fresh.id,
     region: raw.region ?? fresh.region,
     customCity: raw.customCity ?? '',
+    landShape: raw.landShape ?? fresh.landShape,
+    boundaryNorth: raw.boundaryNorth ?? 0,
+    boundaryEast: raw.boundaryEast ?? 0,
+    boundarySouth: raw.boundarySouth ?? 0,
+    boundaryWest: raw.boundaryWest ?? 0,
     streetsCount: raw.streetsCount ?? fresh.streetsCount,
     streetWidth: raw.streetWidth ?? raw.frontage ?? 0,
     landPricePerSqm: raw.landPricePerSqm ?? 0,
@@ -918,6 +948,11 @@ const migrateProject = (raw: Partial<FeasibilityProject>): FeasibilityProject =>
       basementEnabled: rawCompliance?.basementEnabled ?? rawBuild?.basement ?? false,
       residentialUnits: rawCompliance?.residentialUnits ?? 0,
       parkingPerUnit: rawCompliance?.parkingPerUnit ?? fresh.compliance.parkingPerUnit,
+      serviceAreas: Array.isArray(rawCompliance?.serviceAreas) ? rawCompliance.serviceAreas.map((item, index) => ({
+        id: item.id || `service-${index}`,
+        label: item.label ?? '',
+        area: Number.isFinite(item.area) ? item.area : 0,
+      })) : [],
       overrides: rawCompliance?.overrides ?? {},
     },
     build: {
