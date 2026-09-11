@@ -1,0 +1,68 @@
+name: Apply permit actual areas patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/permit_actual_areas_patch.py
+      - .github/workflows/permit-actual-areas-patch.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Apply patch
+        run: python3 .github/scripts/permit_actual_areas_patch.py
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm --filter @workspace/real-estate-feasibility run typecheck
+      - name: Production build
+        env:
+          PORT: 5000
+          BASE_PATH: /real-estate-feasibility-saudi/
+        run: pnpm --filter @workspace/real-estate-feasibility run build
+      - name: Verify exact permit arithmetic
+        run: |
+          node - <<'NODE'
+          const ground=397.31, repeated=1376.28, annex=194.76;
+          const services=397.31+27.56+66.64+8.00;
+          const above=ground+repeated+annex;
+          const licensed=above+services;
+          const repeatedOne=repeated/3;
+          const checks=[
+            ['ground',ground,397.31],
+            ['repeated one',repeatedOne,458.76],
+            ['repeated total',repeated,1376.28],
+            ['annex',annex,194.76],
+            ['above ground',above,1968.35],
+            ['services',services,499.51],
+            ['licensed total',licensed,2467.86],
+          ];
+          for (const [name,actual,expected] of checks) {
+            if (Math.abs(actual-expected)>1e-9) throw new Error(`${name}: ${actual} != ${expected}`);
+            console.log(`PASS ${name}: ${actual.toFixed(2)}`);
+          }
+          NODE
+      - name: Validate and commit
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/real-estate-feasibility/src/App.tsx artifacts/real-estate-feasibility/src/lib/project-model.ts artifacts/real-estate-feasibility/src/lib/report-generator.ts
+          git commit -m "Support exact permit area inputs"
+          git push origin main
