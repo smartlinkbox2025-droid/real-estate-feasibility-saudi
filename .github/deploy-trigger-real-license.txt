@@ -1,0 +1,2 @@
+Deploy marker for the verified real-license compatibility patch.
+Patch commit: 8b8580fe0429778323e48882b90e312de800cc94
