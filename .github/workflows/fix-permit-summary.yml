@@ -1,0 +1,67 @@
+name: Fix permit summary display
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/fix_permit_summary.py
+      - .github/workflows/fix-permit-summary.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Apply fix
+        run: python3 .github/scripts/fix_permit_summary.py
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm --filter @workspace/real-estate-feasibility run typecheck
+      - name: Production build
+        env:
+          PORT: 5000
+          BASE_PATH: /real-estate-feasibility-saudi/
+        run: pnpm --filter @workspace/real-estate-feasibility run build
+      - name: Verify permit arithmetic
+        run: |
+          python3 - <<'PY'
+          ground=397.31
+          repeated_total=1376.28
+          repeated_floors=3
+          annex=194.76
+          services=27.56+66.64+8+397.31
+          repeated_one=repeated_total/repeated_floors
+          above=ground+repeated_total+annex
+          licensed=above+services
+          assert round(repeated_one,2)==458.76
+          assert round(above,2)==1968.35
+          assert round(services,2)==499.51
+          assert round(licensed,2)==2467.86
+          print('Permit arithmetic PASS:', repeated_one, above, services, licensed)
+          PY
+      - name: Commit application fix
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/real-estate-feasibility/src/App.tsx
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Fix permit-mode repeated floor and annex summary"
+            git push origin main
+          fi
